@@ -110,24 +110,9 @@ do_install_docker() {
     fi
 }
 
-
-get_current_user_home_dir() {
-    local USER=""
-    USER=$(whoami)
-    local USER_DIR=""
-    USER_DIR=$(getent passwd $USER | cut -d: -f6)
-
-    echo "$USER_DIR"
-}
-
-
-
-
-
-
-
 do_install_kubernetes() {
-    if [ "$1" == "Ubuntu" ] || [ "$1" == "Debian" ]; then
+    local DISTRO="$( get_linux_distro )"
+    if [ "$DISTRO" == "Ubuntu" ] || [ "$DISTRO" == "Debian" ]; then
         # Ensure IP tables tooling does not use nftables backend
         update-alternatives --set iptables /usr/sbin/iptables-legacy
         update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
@@ -139,7 +124,7 @@ do_install_kubernetes() {
         apt-get update
         apt-get install -y kubelet kubeadm kubectl
     fi
-    if [ "$1" == "CentOS" ]; then
+    if [ "$DISTRO" == "CentOS" ]; then
         # Ensure IP tables tooling does not use nftables backend
         update-alternatives --set iptables /usr/sbin/iptables-legacy
         # Configure kubernetes repository
@@ -157,6 +142,26 @@ do_install_kubernetes() {
         systemctl start kubelet
     fi
 }
+
+
+
+
+get_current_user_home_dir() {
+    local USER=""
+    USER=$(whoami)
+    local USER_DIR=""
+    USER_DIR=$(getent passwd $USER | cut -d: -f6)
+
+    echo "$USER_DIR"
+}
+
+
+
+
+
+
+
+
 
 do_setup_firewall() {
     if [ "$1" == "Debian" ]; then

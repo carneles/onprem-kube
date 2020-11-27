@@ -1,5 +1,5 @@
 #!/bin/bash
-source misc.sh
+source functions.sh
 
 do_setup_firewall() {
     local DISTRO="$( get_linux_distro )"
@@ -68,7 +68,54 @@ do_setup_firewall() {
     fi
 }
 
+do_initialize_node() {
+    local DISTRO="$( get_linux_distro )"
+    local HOSTNAME=""
+    HOSTNAME=$(hostname)
+
+    # deactivate swap
+    swapoff -a
+    echo "Swap disabled temporarily! Setting up /etc/fstab for permanent swapoff."
+    if [ "$DISTRO" == "Ubuntu" ]; then
+        sed -i.bak 's/\/swap.img/#\/swap.img/g' /etc/fstab
+    fi
+    if [ "$DISTRO" == "Debian" ]; then
+        sed -i.bak '/swap/ s/^/#/' /etc/fstab
+    fi
+    if [ "$DISTRO" == "CentOS" ]; then
+        sed -i.bak 's/\/dev\/mapper\/centos-swap/#\/dev\/mapper\/centos-swap/g' /etc/fstab
+    fi
+    
+    # initialize master node
+    kubeadm init --pod-network-cidr=10.244.0.0/16
+    # Configure cgroup driver used by kubelet on control-plane node
+    sed -i.bak 's/KUBELET_KUBEADM_ARGS="--cgroup-driver=cgroupfs/KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd/g' /var/lib/kubelet/kubeadm-flags.env
+    systemctl daemon-reload
+    systemctl restart kubelet
+
+    mkdir -p /home/$SUDO_USER/.kube
+    chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.kube
+    cp -i /etc/kubernetes/admin.conf /home/$SUDO_USER/.kube/config
+    chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.kube/config
+
+    mkdir -p /root/.kube
+    chown root:root /root/.kube
+    cp -i /etc/kubernetes/admin.conf /root/.kube/config
+    chown root:root /root/.kube/config
+
+    echo "Please wait a moment..."
+    sleep 10
+
+    echo "Install networking pods..."
+    kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    # Deploy Pod network
+    echo "Waiting master to be ready..."
+    kubectl wait --for=condition=ready nodes/$HOSTNAME --timeout=60s
+    echo "Kubernetes master setup finished. You can now join worker to the master."
+}
+
 # Step 1. Check OS type and version
+echo "Checking system..."
 do_check_os
 
 # Step 2. Update the OS
@@ -85,12 +132,12 @@ do_setup_firewall
 
 # Step 5. Install Docker
 echo "Installing docker..."
-do_install_docker "$DISTRO"
+do_install_docker
 
-    ## Step 4. Install Kubernetes
-    echo "Installing kubernetes..."
-    do_install_kubernetes "$DISTRO"
+# Step 6. Install Kubernetes
+echo "Installing kubernetes..."
+do_install_kubernetes
 
-    ## Step 5. Initialize Master or Worker nodes
-    echo "Initialize node..."
-    do_initialize_node "$DISTRO" "$1"
+# Step 7. Initialize Master or Worker nodes
+echo "Initialize node..."
+do_initialize_node
