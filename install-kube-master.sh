@@ -114,6 +114,8 @@ do_initialize_node() {
     echo "Kubernetes master setup finished. You can now join worker to the master."
 }
 
+echo "$( date ) Install kube master script start"
+
 # Step 1. Check OS type and version
 echo "Checking system..."
 do_check_os
@@ -141,3 +143,5 @@ do_install_kubernetes
 # Step 7. Initialize Master or Worker nodes
 echo "Initialize node..."
 do_initialize_node
+
+echo "$( date ) Install kube master script end"
