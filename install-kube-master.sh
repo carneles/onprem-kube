@@ -9,19 +9,20 @@ do_setup_firewall() {
     if [ "$DISTRO" == "Ubuntu" ] || [ "$DISTRO" == "Debian" ]; then
         # Setup firewall
         ufw --force enable
-
+        
         ufw allow 22/tcp            # ssh
-        ufw allow 53/udp            
+        ufw allow 53/udp            # dns
+        # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#control-plane-node-s
         ufw allow 443/tcp           # https
-        ufw allow 6443/tcp
-        ufw allow 2379:2380/tcp
-        ufw allow 10250/tcp
-        ufw allow 10251/tcp
-        ufw allow 10252/tcp
+        ufw allow 6443/tcp          # kube api server
+        ufw allow 2379:2380/tcp     # etcd server client api
+        ufw allow 10250/tcp         # kubelet api
+        ufw allow 10251/tcp         # kube scheduler
+        ufw allow 10252/tcp         # kube controller manager
         ufw allow 10255/tcp
-        # kube flannel
+        # kube flannel https://github.com/coreos/flannel/blob/master/Documentation/backends.md
         ufw allow 8285/udp
-        ufw allow 8472/udp
+        ufw allow 8472/udp          
 
         ufw allow out on weave to 10.244.0.0/12
         ufw allow in on weave from 10.244.0.0/12
@@ -34,9 +35,9 @@ do_setup_firewall() {
     fi
     if [ "$1" == "CentOS" ]; then
         # Setup firewall
-        firewall-cmd --permanent --add-port=22/tcp
+        firewall-cmd --permanent --add-port=22/tcp          # ssh
         firewall-cmd --permanent --add-port=53/udp
-        firewall-cmd --permanent --add-port=443/tcp
+        firewall-cmd --permanent --add-port=443/tcp         # https
 
         firewall-cmd --permanent --add-port=6443/tcp
         firewall-cmd --permanent --add-port=2379-2380/tcp

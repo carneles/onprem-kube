@@ -8,20 +8,21 @@ do_setup_firewall() {
     if [ "$1" == "Ubuntu" ] || [ "$1" == "Debian" ]; then
         # Setup firewall
         ufw --force enable
-        ufw allow 22/tcp
+        ufw allow 22/tcp            # ssh
+        ufw allow 53/udp            # dns
 
-        ufw allow 53/udp
-        ufw allow 6443/tcp
-        ufw allow 10250/tcp
-        ufw allow 10251/tcp
-        ufw allow 10255/tcp
-        ufw allow 30000:32767/tcp
-        ufw allow 2379:2380/tcp
-        # kube flannel
+        # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#worker-node-s
+        # ufw allow 6443/tcp
+        ufw allow 10250/tcp         # kubelet api
+        # ufw allow 10251/tcp
+        # ufw allow 10255/tcp
+        ufw allow 30000:32767/tcp   # node port services
+        # ufw allow 2379:2380/tcp
+        # kube flannel # kube flannel https://github.com/coreos/flannel/blob/master/Documentation/backends.md
         ufw allow 8285/udp
         ufw allow 8472/udp
         # calico
-        ufw allow 179/tcp
+        # ufw allow 179/tcp
 
         ufw allow out on weave to 10.244.0.0/12
         ufw allow in on weave from 10.244.0.0/12
