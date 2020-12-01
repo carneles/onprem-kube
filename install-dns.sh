@@ -2,6 +2,22 @@
 source functions.sh
 
 do_install_bind9() {
+    echo "Please enter frontend's SLB IP Address: "
+    read FRONTEND_SLB_IP
+    echo "(echo) Frontend's SLB IP: $FRONTEND_SLB_IP"
+    echo "Please enter backend's SLB IP Address: "
+    read BACKEND_SLB_IP
+    echo "(echo) Backend's SLB IP: $BACKEND_SLB_IP"
+    echo "Please enter service's domain: "
+    read SERVICE_DOMAIN
+    echo "(echo) Service domain (only TLD - e.g. test.com): $SERVICE_DOMAIN"
+    echo "Please enter frontend's subdomain: "
+    read FRONTEND_SUB_DOMAIN
+    echo "(echo) Frontend sub domain: $FRONTEND_SUB_DOMAIN"
+    echo "Please enter backend's subdomain: "
+    read BACKEND_SUB_DOMAIN
+    echo "(echo) Backend sub domain: $BACKEND_SUB_DOMAIN"
+    
     local DISTRO="$( get_linux_distro )"
     local HOST_IP=""
     HOST_IP=$(hostname -I | cut -d \  -f1)
@@ -237,6 +253,8 @@ do_setup_firewall() {
         sysctl -p
     fi
 }
+
+
 
 echo "$( date ) Install Bind9 DNS script start"
 
