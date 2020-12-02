@@ -2,27 +2,27 @@
 source functions.sh
 
 do_setup_firewall() {
-    local DISTRO="$( get_linux_distro )"
-    if [ "$DISTRO" == "Debian" ]; then
+    if [ "$1" == "Debian" ]; then
         apt-get install -y ufw
     fi
-    if [ "$DISTRO" == "Ubuntu" ] || [ "$DISTRO" == "Debian" ]; then
+    if [ "$1" == "Ubuntu" ] || [ "$1" == "Debian" ]; then
         # Setup firewall
         ufw --force enable
-        
         ufw allow 22/tcp            # ssh
         ufw allow 53/udp            # dns
-        # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#control-plane-node-s
-        ufw allow 443/tcp           # https
-        ufw allow 6443/tcp          # kube api server
-        ufw allow 2379:2380/tcp     # etcd server client api
+
+        # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#worker-node-s
+        # ufw allow 6443/tcp
         ufw allow 10250/tcp         # kubelet api
-        ufw allow 10251/tcp         # kube scheduler
-        ufw allow 10252/tcp         # kube controller manager
-        ufw allow 10255/tcp
-        # kube flannel https://github.com/coreos/flannel/blob/master/Documentation/backends.md
+        # ufw allow 10251/tcp
+        # ufw allow 10255/tcp
+        ufw allow 30000:32767/tcp   # node port services
+        # ufw allow 2379:2380/tcp
+        # kube flannel # kube flannel https://github.com/coreos/flannel/blob/master/Documentation/backends.md
         ufw allow 8285/udp
-        ufw allow 8472/udp          
+        ufw allow 8472/udp
+        # calico
+        # ufw allow 179/tcp
 
         ufw allow out on weave to 10.244.0.0/12
         ufw allow in on weave from 10.244.0.0/12
@@ -31,37 +31,38 @@ do_setup_firewall() {
             update-alternatives --set iptables /usr/sbin/iptables-legacy
             update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
         fi
+
         ufw reload
     fi
     if [ "$1" == "CentOS" ]; then
         # Setup firewall
-        firewall-cmd --permanent --add-port=22/tcp          # ssh
-        firewall-cmd --permanent --add-port=53/udp
-        firewall-cmd --permanent --add-port=443/tcp         # https
+        firewall-cmd --permanent --add-port=22/tcp
 
+        firewall-cmd --permanent --add-port=53/udp
         firewall-cmd --permanent --add-port=6443/tcp
-        firewall-cmd --permanent --add-port=2379-2380/tcp
         firewall-cmd --permanent --add-port=10250/tcp
         firewall-cmd --permanent --add-port=10251/tcp
-        firewall-cmd --permanent --add-port=10252/tcp
         firewall-cmd --permanent --add-port=10255/tcp
+        firewall-cmd --permanent --add-port=30000-32767/tcp
 
+        firewall-cmd --permanent --add-port=2379-2380/tcp
         # kube flannel
         firewall-cmd --permanent --add-port=8285/udp
         firewall-cmd --permanent --add-port=8472/udp
+        # calico
+        firewall-cmd --permanent --add-port=179/tcp
 
         firewall-cmd --zone=internal --add-interface=weave --permanent
         firewall-cmd --zone=internal --add-interface=docker --permanent
 
         #Then, add the dns service to those interfaces:
+
         firewall-cmd --zone=internal --add-service=dns --permanent 
         
         firewall-cmd --reload
-
         # Disable SELinux
         setenforce 0
         sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-
         # Kernel setting
         echo "net.bridge.bridge-nf-call-ip6tables = 1" > /etc/sysctl.d/k8s.conf
         echo "net.bridge.bridge-nf-call-iptables = 1" >> /etc/sysctl.d/k8s.conf
@@ -70,9 +71,21 @@ do_setup_firewall() {
 }
 
 do_initialize_node() {
+    echo "Please enter master node's IP Address (and port): "
+    read MASTER_IP
+    echo "(echo) Master IP: $MASTER_IP"
+    echo "Please enter master node's token: " 
+    read MASTER_TOKEN
+    echo "(echo) Master Token: $MASTER_TOKEN"
+    echo "Please enter master node's hashed discovery token: "
+    read MASTER_DISCOVERY_TOKEN
+    echo "(echo) Master Hashed Discovery Token: $MASTER_DISCOVERY_TOKEN"
+    
     local DISTRO="$( get_linux_distro )"
     local HOSTNAME=""
     HOSTNAME=$(hostname)
+    local USER=""
+    USER=$(whoami)
 
     # deactivate swap
     swapoff -a
@@ -87,35 +100,15 @@ do_initialize_node() {
         sed -i.bak 's/\/dev\/mapper\/centos-swap/#\/dev\/mapper\/centos-swap/g' /etc/fstab
     fi
     
-    # initialize master node
-    kubeadm init --pod-network-cidr=10.244.0.0/16
-    # Configure cgroup driver used by kubelet on control-plane node
-    sed -i.bak 's/KUBELET_KUBEADM_ARGS="--cgroup-driver=cgroupfs/KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd/g' /var/lib/kubelet/kubeadm-flags.env
-    systemctl daemon-reload
-    systemctl restart kubelet
-
-    mkdir -p /home/$SUDO_USER/.kube
-    chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.kube
-    cp -i /etc/kubernetes/admin.conf /home/$SUDO_USER/.kube/config
-    chown $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.kube/config
-
-    mkdir -p /root/.kube
-    chown root:root /root/.kube
-    cp -i /etc/kubernetes/admin.conf /root/.kube/config
-    chown root:root /root/.kube/config
-
     echo "Please wait a moment..."
     sleep 10
 
-    echo "Install networking pods..."
-    kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-    # Deploy Pod network
-    echo "Waiting master to be ready..."
-    kubectl wait --for=condition=ready nodes/$HOSTNAME --timeout=60s
-    echo "Kubernetes master setup finished. You can now join worker to the master."
+    echo "Joining master node..."
+    kubeadm join $MASTER_IP --token $MASTER_TOKEN --discovery-token-ca-cert-hash $MASTER_DISCOVERY_TOKEN
+    echo "Kubernetes worker setup finished. You can now start to deploy your services."
 }
 
-echo "$( date ) Install kube master script start"
+echo "$( date ) Install kube worker script start"
 
 # Step 1. Check OS type and version
 echo "Checking system..."
@@ -145,4 +138,4 @@ do_install_kubernetes
 echo "Initialize node..."
 do_initialize_node
 
-echo "$( date ) Install kube master script end"
+echo "$( date ) Install kube worker script end"
