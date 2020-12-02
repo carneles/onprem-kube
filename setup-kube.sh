@@ -29,3 +29,9 @@ subjects:
 EOF
 
 kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk '{print $1}')
+
+
+
+helm repo add nginx-stable https://helm.nginx.com/stable
+helm repo update
+helm install nginx-ingress --set controller.service.type=NodePort nginx-stable/nginx-ingress
