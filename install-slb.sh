@@ -12,7 +12,7 @@ do_install_haproxy() {
         yum install -y haproxy
     fi
 
-    echo "Please enter worker's IP Address (and port): "
+    echo "Please enter worker's IP Address (and port -- Nginx Ingress NodePort): "
     read SERVICE_IP
     echo "(echo) Service IP: $SERVICE_IP"
     echo "Please enter service's full domain (with sub domain - e.g. www.test.com): "

@@ -2,10 +2,11 @@
 source functions.sh
 
 do_setup_firewall() {
-    if [ "$1" == "Debian" ]; then
+    local DISTRO="$( get_linux_distro )"
+    if [ "$DISTRO" == "Debian" ]; then
         apt-get install -y ufw
     fi
-    if [ "$1" == "Ubuntu" ] || [ "$1" == "Debian" ]; then
+    if [ "$DISTRO" == "Ubuntu" ] || [ "$DISTRO" == "Debian" ]; then
         # Setup firewall
         ufw --force enable
         ufw allow 22/tcp            # ssh
@@ -27,14 +28,14 @@ do_setup_firewall() {
         ufw allow out on weave to 10.244.0.0/12
         ufw allow in on weave from 10.244.0.0/12
 
-        if [ "$1" == "Debian" ]; then
+        if [ "$DISTRO" == "Debian" ]; then
             update-alternatives --set iptables /usr/sbin/iptables-legacy
             update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
         fi
 
         ufw reload
     fi
-    if [ "$1" == "CentOS" ]; then
+    if [ "$DISTRO" == "CentOS" ]; then
         # Setup firewall
         firewall-cmd --permanent --add-port=22/tcp
 

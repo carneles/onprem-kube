@@ -2,21 +2,15 @@
 source functions.sh
 
 do_install_bind9() {
-    echo "Please enter frontend's SLB IP Address: "
-    read FRONTEND_SLB_IP
-    echo "(echo) Frontend's SLB IP: $FRONTEND_SLB_IP"
-    echo "Please enter backend's SLB IP Address: "
-    read BACKEND_SLB_IP
-    echo "(echo) Backend's SLB IP: $BACKEND_SLB_IP"
-    echo "Please enter service's domain: "
+    echo "Please enter app's SLB IP Address: "
+    read SLB_IP
+    echo "(echo) Application's SLB IP: $SLB_IP"
+    echo "Please enter service's domain (only TLD - e.g. test.com): "
     read SERVICE_DOMAIN
     echo "(echo) Service domain (only TLD - e.g. test.com): $SERVICE_DOMAIN"
-    echo "Please enter frontend's subdomain: "
-    read FRONTEND_SUB_DOMAIN
-    echo "(echo) Frontend sub domain: $FRONTEND_SUB_DOMAIN"
-    echo "Please enter backend's subdomain: "
-    read BACKEND_SUB_DOMAIN
-    echo "(echo) Backend sub domain: $BACKEND_SUB_DOMAIN"
+    echo "Please enter application's subdomain: "
+    read SUB_DOMAIN
+    echo "(echo) Application sub domain: $SUB_DOMAIN"
     
     local DISTRO="$( get_linux_distro )"
     local HOST_IP=""
@@ -34,8 +28,7 @@ do_install_bind9() {
         mv /etc/bind/named.conf.options /etc/bind/named.conf.options.bak
         echo "acl \"trusted\" {" > /etc/bind/named.conf.options
         echo "        $HOST_IP;             # ns1 - can be set to localhost" >> /etc/bind/named.conf.options
-        echo "        $FRONTEND_SLB_IP;     # frontend SLB IP" >> /etc/bind/named.conf.options
-        echo "        $BACKEND_SLB_IP;      # backend SLB IP" >> /etc/bind/named.conf.options
+        echo "        $SLB_IP;              # application SLB IP" >> /etc/bind/named.conf.options
         echo "};" >> /etc/bind/named.conf.options
         echo "" >> /etc/bind/named.conf.options
         echo "options {" >> /etc/bind/named.conf.options
@@ -57,7 +50,7 @@ do_install_bind9() {
         echo "        listen-on-v6 { any; };" >> /etc/bind/named.conf.options
         echo "};" >> /etc/bind/named.conf.options
 
-        local IP=(${FRONTEND_SLB_IP//./ });
+        local IP=(${SLB_IP//./ });
         # named.conf.local
         mv /etc/bind/named.conf.local /etc/bind/named.conf.local.bak
         echo "zone \"$SERVICE_DOMAIN\" {" > /etc/bind/named.conf.local
@@ -86,11 +79,9 @@ do_install_bind9() {
         echo "ns1.$SERVICE_DOMAIN.          IN      A       $HOST_IP" >> /etc/bind/zones/db.$SERVICE_DOMAIN
         echo "" >> /etc/bind/zones/db.$SERVICE_DOMAIN
         echo "; ${IP[0]}.${IP[1]}.0.0/16 - A records" >> /etc/bind/zones/db.$SERVICE_DOMAIN
-        echo "$FRONTEND_SUB_DOMAIN.$SERVICE_DOMAIN.        IN      A      $FRONTEND_SLB_IP" >> /etc/bind/zones/db.$SERVICE_DOMAIN
-        echo "$BACKEND_SUB_DOMAIN.$SERVICE_DOMAIN.        IN      A      $BACKEND_SLB_IP" >> /etc/bind/zones/db.$SERVICE_DOMAIN
+        echo "$SUB_DOMAIN.$SERVICE_DOMAIN.        IN      A      $SLB_IP" >> /etc/bind/zones/db.$SERVICE_DOMAIN
 
-        local IP_FRONTEND=(${FRONTEND_SLB_IP//./ });
-        local IP_BACKEND=(${BACKEND_SLB_IP//./ });
+        local IP_APP=(${SLB_IP//./ });
         local IP_HOST=(${HOST_IP//./ });
 
         echo "\$TTL    604800" > /etc/bind/zones/db.${IP[0]}.${IP[1]}
@@ -107,8 +98,7 @@ do_install_bind9() {
         echo "; PTR Records" >> /etc/bind/zones/db.${IP[0]}.${IP[1]}
         echo "${IP_HOST[3]}.${IP_HOST[2]}   IN      PTR     ns1.$SERVICE_DOMAIN.    ; $HOST_IP" >> /etc/bind/zones/db.${IP[0]}.${IP[1]}
         echo "" >> /etc/bind/zones/db.${IP[0]}.${IP[1]}
-        echo "${IP_FRONTEND[3]}.${IP_FRONTEND[2]} IN      PTR     $FRONTEND_SUB_DOMAIN.$SERVICE_DOMAIN.  ; $FRONTEND_SLB_IP" >> /etc/bind/zones/db.${IP[0]}.${IP[1]}
-        echo "${IP_BACKEND[3]}.${IP_BACKEND[2]} IN      PTR     $BACKEND_SUB_DOMAIN.$SERVICE_DOMAIN.  ; $BACKEND_SLB_IP" >> /etc/bind/zones/db.${IP[0]}.${IP[1]}
+        echo "${IP_APP[3]}.${IP_APP[2]} IN      PTR     $SUB_DOMAIN.$SERVICE_DOMAIN.  ; $SLB_IP" >> /etc/bind/zones/db.${IP[0]}.${IP[1]}
 
         systemctl restart bind9
     fi
@@ -118,8 +108,7 @@ do_install_bind9() {
         mv /etc/named.conf /etc/named.conf.bak
         echo "acl \"trusted\" {" > /etc/named.conf
         echo "        $HOST_IP;             # ns1 - can be set to localhost" >> /etc/named.conf
-        echo "        $FRONTEND_SLB_IP;     # frontend SLB IP" >> /etc/named.conf
-        echo "        $BACKEND_SLB_IP;      # backend SLB IP" >> /etc/named.conf
+        echo "        $SLB_IP;     # application SLB IP" >> /etc/named.conf
         echo "};" >> /etc/named.conf
         echo "" >> /etc/named.conf
         echo "options {" >> /etc/named.conf
@@ -163,7 +152,7 @@ do_install_bind9() {
         echo "include \"/etc/named.root.key\";" >> /etc/named.conf
         echo "include \"/etc/named/named.conf.local\";" >> /etc/named.conf
 
-        local IP=(${FRONTEND_SLB_IP//./ });
+        local IP=(${SLB_IP//./ });
         # named.conf.local
         echo "zone \"$SERVICE_DOMAIN\" {" > /etc/named/named.conf.local
         echo "    type master;" >> /etc/named/named.conf.local
@@ -192,11 +181,9 @@ do_install_bind9() {
         echo "ns1.$SERVICE_DOMAIN.          IN      A       $HOST_IP" >> /etc/named/zones/db.$SERVICE_DOMAIN
         echo "" >> /etc/named/zones/db.$SERVICE_DOMAIN
         echo "; ${IP[0]}.${IP[1]}.0.0/16 - A records" >> /etc/named/zones/db.$SERVICE_DOMAIN
-        echo "$FRONTEND_SUB_DOMAIN.$SERVICE_DOMAIN.        IN      A      $FRONTEND_SLB_IP" >> /etc/named/zones/db.$SERVICE_DOMAIN
-        echo "$BACKEND_SUB_DOMAIN.$SERVICE_DOMAIN.        IN      A      $BACKEND_SLB_IP" >> /etc/named/zones/db.$SERVICE_DOMAIN
+        echo "$SUB_DOMAIN.$SERVICE_DOMAIN.        IN      A      $SLB_IP" >> /etc/named/zones/db.$SERVICE_DOMAIN
 
-        local IP_FRONTEND=(${FRONTEND_SLB_IP//./ });
-        local IP_BACKEND=(${BACKEND_SLB_IP//./ });
+        local IP_APP=(${SLB_IP//./ });
         local IP_HOST=(${HOST_IP//./ });
 
         echo "\$TTL    604800" > /etc/named/zones/db.${IP[0]}.${IP[1]}
@@ -213,8 +200,7 @@ do_install_bind9() {
         echo "; PTR Records" >> /etc/named/zones/db.${IP[0]}.${IP[1]}
         echo "${IP_HOST[3]}.${IP_HOST[2]}   IN      PTR     ns1.$SERVICE_DOMAIN.    ; $HOST_IP" >> /etc/named/zones/db.${IP[0]}.${IP[1]}
         echo "" >> /etc/named/zones/db.${IP[0]}.${IP[1]}
-        echo "${IP_FRONTEND[3]}.${IP_FRONTEND[2]} IN      PTR     $FRONTEND_SUB_DOMAIN.$SERVICE_DOMAIN.  ; $FRONTEND_SLB_IP" >> /etc/named/zones/db.${IP[0]}.${IP[1]}
-        echo "${IP_BACKEND[3]}.${IP_BACKEND[2]} IN      PTR     $BACKEND_SUB_DOMAIN.$SERVICE_DOMAIN.  ; $BACKEND_SLB_IP" >> /etc/named/zones/db.${IP[0]}.${IP[1]}
+        echo "${IP_APP[3]}.${IP_APP[2]} IN      PTR     $SUB_DOMAIN.$SERVICE_DOMAIN.  ; $SLB_IP" >> /etc/named/zones/db.${IP[0]}.${IP[1]}
 
         systemctl start named
         systemctl enable named
