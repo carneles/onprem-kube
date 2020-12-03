@@ -5,7 +5,7 @@ do_install_bind9() {
     echo "Please enter app's SLB IP Address: "
     read SLB_IP
     echo "(echo) Application's SLB IP: $SLB_IP"
-    echo "Please enter service's domain: "
+    echo "Please enter service's domain (only TLD - e.g. test.com): "
     read SERVICE_DOMAIN
     echo "(echo) Service domain (only TLD - e.g. test.com): $SERVICE_DOMAIN"
     echo "Please enter application's subdomain: "
